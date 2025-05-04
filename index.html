@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flappy Bird</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #70c5ce;
+      font-family: Arial, sans-serif;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background: #70c5ce;
+    }
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      color: white;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="score">Score: 0</div>
+  <canvas id="gameCanvas" width="320" height="480"></canvas>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let frames = 0;
+    const DEGREE = Math.PI / 180;
+
+    const sprite = new Image();
+    sprite.src = "https://openai-flappy-bird.s3.amazonaws.com/sprites.png";
+
+    const bird = {
+      x: 50,
+      y: 150,
+      width: 34,
+      height: 26,
+      gravity: 0.25,
+      jump: 4.6,
+      velocity: 0,
+      radius: 12,
+
+      draw() {
+        ctx.fillStyle = "#FF0";
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+      },
+
+      flap() {
+        this.velocity = -this.jump;
+      },
+
+      update() {
+        this.velocity += this.gravity;
+        this.y += this.velocity;
+
+        if (this.y + this.radius >= canvas.height) {
+          this.y = canvas.height - this.radius;
+          gameOver();
+        }
+      },
+
+      reset() {
+        this.y = 150;
+        this.velocity = 0;
+      }
+    };
+
+    const pipes = [];
+    const pipeGap = 100;
+    const pipeWidth = 50;
+    let pipeSpeed = 2;
+    let score = 0;
+
+    function spawnPipe() {
+      const top = Math.floor(Math.random() * 200) + 50;
+      pipes.push({
+        x: canvas.width,
+        topY: top - pipeGap,
+        bottomY: top + pipeGap
+      });
+    }
+
+    function updatePipes() {
+      for (let i = 0; i < pipes.length; i++) {
+        pipes[i].x -= pipeSpeed;
+
+        // Score increase
+        if (pipes[i].x + pipeWidth === bird.x) {
+          score++;
+          document.getElementById("score").innerText = "Score: " + score;
+        }
+
+        // Collision
+        if (
+          bird.x + bird.radius > pipes[i].x &&
+          bird.x - bird.radius < pipes[i].x + pipeWidth &&
+          (bird.y - bird.radius < pipes[i].topY ||
+            bird.y + bird.radius > pipes[i].bottomY)
+        ) {
+          gameOver();
+        }
+      }
+
+      if (pipes.length > 0 && pipes[0].x + pipeWidth < 0) {
+        pipes.shift();
+      }
+
+      if (frames % 100 === 0) {
+        spawnPipe();
+      }
+    }
+
+    function drawPipes() {
+      ctx.fillStyle = "#0f0";
+      pipes.forEach(pipe => {
+        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.topY);
+        ctx.fillRect(pipe.x, pipe.bottomY, pipeWidth, canvas.height - pipe.bottomY);
+      });
+    }
+
+    function gameOver() {
+      alert("Game Over! Final Score: " + score);
+      bird.reset();
+      pipes.length = 0;
+      score = 0;
+      document.getElementById("score").innerText = "Score: 0";
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      bird.draw();
+      drawPipes();
+    }
+
+    function update() {
+      bird.update();
+      updatePipes();
+    }
+
+    function loop() {
+      update();
+      draw();
+      frames++;
+      requestAnimationFrame(loop);
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.code === "Space") bird.flap();
+    });
+
+    spawnPipe();
+    loop();
+  </script>
+</body>
+</html>
