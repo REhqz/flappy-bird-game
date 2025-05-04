@@ -2,167 +2,171 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Flappy Bird</title>
   <style>
     body {
       margin: 0;
       overflow: hidden;
-      background-color: #70c5ce;
+      background: #4ec0ca;
       font-family: Arial, sans-serif;
     }
     canvas {
       display: block;
       margin: auto;
-      background: #70c5ce;
+      background: #4ec0ca;
     }
     #score {
       position: absolute;
-      top: 10px;
+      top: 20px;
       left: 50%;
       transform: translateX(-50%);
-      font-size: 24px;
       color: white;
+      font-size: 28px;
       font-weight: bold;
+      z-index: 2;
     }
   </style>
 </head>
 <body>
   <div id="score">Score: 0</div>
-  <canvas id="gameCanvas" width="320" height="480"></canvas>
-
+  <canvas id="game" width="400" height="600"></canvas>
   <script>
-    const canvas = document.getElementById("gameCanvas");
+    const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
 
-    let frames = 0;
-    const DEGREE = Math.PI / 180;
-
-    const sprite = new Image();
-    sprite.src = "https://openai-flappy-bird.s3.amazonaws.com/sprites.png";
+    const gravity = 0.5;
+    const jump = -8;
+    const pipeGap = 140;
+    const pipeWidth = 60;
+    let frame = 0;
+    let score = 0;
+    let gameOver = false;
 
     const bird = {
-      x: 50,
-      y: 150,
-      width: 34,
-      height: 26,
-      gravity: 0.25,
-      jump: 4.6,
+      x: 80,
+      y: 200,
+      width: 30,
+      height: 30,
       velocity: 0,
-      radius: 12,
-
       draw() {
-        ctx.fillStyle = "#FF0";
+        ctx.fillStyle = "#FFD700"; // Yellow
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
         ctx.fill();
       },
-
-      flap() {
-        this.velocity = -this.jump;
-      },
-
       update() {
-        this.velocity += this.gravity;
+        this.velocity += gravity;
         this.y += this.velocity;
 
-        if (this.y + this.radius >= canvas.height) {
-          this.y = canvas.height - this.radius;
-          gameOver();
+        if (this.y + this.height / 2 >= canvas.height) {
+          lose();
         }
       },
-
+      flap() {
+        this.velocity = jump;
+      },
       reset() {
-        this.y = 150;
+        this.y = 200;
         this.velocity = 0;
       }
     };
 
     const pipes = [];
-    const pipeGap = 100;
-    const pipeWidth = 50;
-    let pipeSpeed = 2;
-    let score = 0;
 
-    function spawnPipe() {
-      const top = Math.floor(Math.random() * 200) + 50;
+    function createPipe() {
+      const topHeight = Math.floor(Math.random() * 250) + 50;
       pipes.push({
         x: canvas.width,
-        topY: top - pipeGap,
-        bottomY: top + pipeGap
+        top: topHeight,
+        bottom: canvas.height - (topHeight + pipeGap),
+      });
+    }
+
+    function drawPipes() {
+      ctx.fillStyle = "#228B22"; // Green
+      pipes.forEach(pipe => {
+        // Top pipe
+        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
+        // Bottom pipe
+        ctx.fillRect(pipe.x, pipe.top + pipeGap, pipeWidth, pipe.bottom);
       });
     }
 
     function updatePipes() {
-      for (let i = 0; i < pipes.length; i++) {
-        pipes[i].x -= pipeSpeed;
+      pipes.forEach(pipe => {
+        pipe.x -= 2;
 
-        // Score increase
-        if (pipes[i].x + pipeWidth === bird.x) {
+        // Collision detection
+        if (
+          bird.x + bird.width / 2 > pipe.x &&
+          bird.x - bird.width / 2 < pipe.x + pipeWidth &&
+          (bird.y - bird.height / 2 < pipe.top || bird.y + bird.height / 2 > pipe.top + pipeGap)
+        ) {
+          lose();
+        }
+
+        // Scoring
+        if (pipe.x + pipeWidth === bird.x) {
           score++;
           document.getElementById("score").innerText = "Score: " + score;
         }
-
-        // Collision
-        if (
-          bird.x + bird.radius > pipes[i].x &&
-          bird.x - bird.radius < pipes[i].x + pipeWidth &&
-          (bird.y - bird.radius < pipes[i].topY ||
-            bird.y + bird.radius > pipes[i].bottomY)
-        ) {
-          gameOver();
-        }
-      }
+      });
 
       if (pipes.length > 0 && pipes[0].x + pipeWidth < 0) {
         pipes.shift();
       }
 
-      if (frames % 100 === 0) {
-        spawnPipe();
+      if (frame % 100 === 0) {
+        createPipe();
       }
     }
 
-    function drawPipes() {
-      ctx.fillStyle = "#0f0";
-      pipes.forEach(pipe => {
-        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.topY);
-        ctx.fillRect(pipe.x, pipe.bottomY, pipeWidth, canvas.height - pipe.bottomY);
-      });
-    }
-
-    function gameOver() {
-      alert("Game Over! Final Score: " + score);
-      bird.reset();
-      pipes.length = 0;
-      score = 0;
-      document.getElementById("score").innerText = "Score: 0";
+    function drawGround() {
+      ctx.fillStyle = "#ded895";
+      ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
     }
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawGround();
       bird.draw();
       drawPipes();
     }
 
     function update() {
+      if (gameOver) return;
       bird.update();
       updatePipes();
-    }
-
-    function loop() {
-      update();
       draw();
-      frames++;
-      requestAnimationFrame(loop);
+      frame++;
+      requestAnimationFrame(update);
     }
 
-    document.addEventListener("keydown", function (e) {
+    function lose() {
+      gameOver = true;
+      alert("Game Over! Your Score: " + score);
+      restartGame();
+    }
+
+    function restartGame() {
+      bird.reset();
+      pipes.length = 0;
+      score = 0;
+      frame = 0;
+      document.getElementById("score").innerText = "Score: 0";
+      gameOver = false;
+      createPipe();
+      update();
+    }
+
+    // Start game
+    createPipe();
+    update();
+
+    // Controls
+    document.addEventListener("keydown", (e) => {
       if (e.code === "Space") bird.flap();
     });
-
-    spawnPipe();
-    loop();
   </script>
 </body>
 </html>
